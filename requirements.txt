@@ -1,0 +1,34 @@
+# Pathogene - requirements.txt
+# pip install -r requirements.txt
+
+# ── Web Framework ──────────────────────────────────────────────────────────────
+flask>=3.0.0
+flask-cors>=4.0.0
+werkzeug>=3.0.0
+
+# ── Whole Slide Image ──────────────────────────────────────────────────────────
+# Windows: openslide-python bundles OpenSlide DLLs automatically via openslide-bin
+# Mac:     brew install openslide  (or handled automatically by openslide-python)
+openslide-python>=1.3.1
+openslide-bin; sys_platform == 'win32'
+
+# ── Image Processing ───────────────────────────────────────────────────────────
+Pillow>=10.0.0
+opencv-python-headless>=4.8.0
+numpy>=1.24.0
+
+# Large image processing for CosMx DZI generation
+# pyvips is the Python binding; pyvips-binary provides pre-built libvips binaries
+# for common platforms. This avoids PIL fallback freezing on large CosMx PNG files.
+pyvips>=2.2.0
+pyvips-binary>=8.16.0
+
+# ── Scientific ─────────────────────────────────────────────────────────────────
+scipy>=1.11.0
+shapely>=2.0.0
+
+# ── System Monitoring (optional, for RAM logging) ─────────────────────────────
+psutil>=5.9.0
+
+# ── Build Tool ─────────────────────────────────────────────────────────────────
+pyinstaller>=6.0.0
