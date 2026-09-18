@@ -413,7 +413,7 @@ body {
       <!-- END ADDED -->
 
       <!-- ADDED: Segmentation GT-coverage evaluation -->
-      <div class="cg" id="segEvalPanel" style="display:none;">
+      <div class="cg" id="segEvalPanel">
         <h4>Segmentation Evaluation</h4>
         <input type="file" id="gtSegInput" accept=".json,.geojson" style="display:none" onchange="loadSegmentationEvalFile(this, 'gt')">
         <button class="sbtn" style="width:100%;margin-bottom:0.35rem;" onclick="document.getElementById('gtSegInput').click()">Load Pathologist GT</button>
@@ -451,30 +451,6 @@ body {
         <button class="sbtn" style="margin-top:0.6rem;width:100%;" onclick="saveCosMxPosition()">Save Position</button>
       </div>
 
-      <div class="cg" id="cosmxManualAlignPanel">
-        <h4>CosMx Manual Align</h4>
-        <div class="sw">
-          <label>Rotation: <span id="rotVal">0</span>°</label>
-          <input type="range" id="rotSlider" min="0" max="360" value="0" step="1" oninput="onRotInput(this)">
-          <div class="pr">
-            <button data-r="0"   onclick="setRotPreset(0)"   class="active">0°</button>
-            <button data-r="90"  onclick="setRotPreset(90)">90°</button>
-            <button data-r="180" onclick="setRotPreset(180)">180°</button>
-            <button data-r="270" onclick="setRotPreset(270)">270°</button>
-          </div>
-        </div>
-        <div class="crow" style="margin-top:0.6rem;">
-          <button class="sbtn" id="btnFlipX" onclick="toggleFlipX()">Flip X</button>
-          <button class="sbtn" id="btnFlipY" onclick="toggleFlipY()">Flip Y</button>
-        </div>
-        <div class="sw" style="margin-top:0.6rem;">
-          <label>Scale: <span id="scaleVal">1.00</span>x</label>
-          <input type="range" id="scaleSlider" min="0.5" max="2.0" value="1.0" step="0.01" oninput="onScaleInput(this)">
-        </div>
-        <button class="sbtn" style="margin-top:0.6rem;width:100%;" onclick="saveCosMxPosition()">Save Position</button>
-      </div>
-
-      
       <!-- ADDED: Confidence Threshold section -->
       <div class="cg">
         <h4>AI Lymphocyte Threshold</h4>
@@ -2534,7 +2510,10 @@ function _magicWandAnnotationFromPolygon(polyOriginal, cls, meta = {}) {
         analysis_level: Number(meta.analysis_level ?? -1),
         seed_x_level0: Number(meta.seed_x_level0 ?? 0),
         seed_y_level0: Number(meta.seed_y_level0 ?? 0),
-        parameters: meta.parameters || {}
+        parameters: meta.parameters || {},
+        // Snapshot of the as-generated SVG, so export can tell whether a
+        // pathologist has since reshaped this polygon by hand.
+        original_svg: svg
       }
     }
   };
@@ -2620,6 +2599,19 @@ async function onMagicWandCanvasClick(evt) {
     // Still truncated after retry: fail rather than silently save a clipped polygon.
     if (data.truncated) {
       statusText('Magic Wand selection is too large for the local window. Try a lower tolerance or click a smaller region.');
+      return;
+    }
+
+    // If heDziDownsample is wrong (e.g. dzi_meta.json missing so it fell back
+    // to 1), the backend's level-0 polygon lands on the wrong region once
+    // converted to DZI pixels here. Cross-check against the slide's actual
+    // dimensions, which the backend reads directly from the file, and bail
+    // rather than silently placing a mis-scaled polygon.
+    const slideW = Number(data.slide_dimensions?.[0] || 0);
+    const dziW = Number(tiledImage.getContentSize?.().x || 0);
+    if (slideW && dziW && Math.abs(dziW * ds - slideW) / slideW > 0.01) {
+      statusText('Magic Wand: DZI/slide scale mismatch detected (check dzi_meta.json) — result discarded');
+      console.error('Magic Wand scale mismatch: dziW*ds=', dziW * ds, 'slide_dimensions[0]=', slideW);
       return;
     }
 
@@ -2759,6 +2751,11 @@ function _annotationToGeoJSONFeature(ann) {
   if (first[0] !== last[0] || first[1] !== last[1]) coords.push([first[0], first[1]]);
 
   const label = _annotationLabel(ann);
+  const mw = ann?.properties?.magic_wand;
+  // A pathologist may have reshaped a wand polygon's vertices after creation.
+  // Compare the current SVG against the as-generated snapshot so exported
+  // provenance distinguishes "wand-assisted" from "wand-assisted, corrected".
+  const mwOut = mw ? { ...mw, edited: mw.original_svg != null ? svg !== mw.original_svg : null } : undefined;
   return {
     type: 'Feature',
     id: ann.id,
@@ -2766,7 +2763,7 @@ function _annotationToGeoJSONFeature(ann) {
       label,
       classification: { name: label },
       source: ann?.properties?.source || 'pathogene_manual_export',
-        ...(ann?.properties?.magic_wand ? { magic_wand: ann.properties.magic_wand } : {})
+      ...(mwOut ? { magic_wand: mwOut } : {})
     },
     geometry: { type: 'Polygon', coordinates: [coords] }
   };
