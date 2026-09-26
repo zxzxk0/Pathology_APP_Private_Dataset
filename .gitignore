@@ -1,0 +1,45 @@
+# Build outputs
+dist/
+build/
+
+# Virtual environments
+.venv/
+.venv-build/
+venv/
+env/
+
+# Runtime/generated data
+data/
+pathogene.log
+*.log
+
+# Whole-slide / large pathology files
+*.svs
+*.tif
+*.tiff
+*.ndpi
+*.scn
+*.dzi
+*_files/
+
+# Large generated image data
+*.png
+*.jpg
+*.jpeg
+
+# Keep frontend UI assets
+!frontend/*.png
+!frontend/*.jpg
+!frontend/*.jpeg
+!frontend/assets/*.png
+!frontend/assets/*.jpg
+!frontend/assets/*.jpeg
+
+# Python cache
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# OS files
+.DS_Store
+Thumbs.db
